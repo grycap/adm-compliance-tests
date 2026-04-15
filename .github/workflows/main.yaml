@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 jobs:
-  unit-tests:
+  dry-run-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the codebase.
