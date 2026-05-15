@@ -21,6 +21,12 @@ ${ALLOCATION_KIND}    None
 ${ADM_AUTH_HEADER}    None
 ${APPLICATION_ID}    None
 ${DEPLOYMENT_ID}    None
+${OPENSTACK_ALLOCATION_ID}    None
+${OPENSTACK_PAYLOAD}    None
+${KUBERNETES_ALLOCATION_ID}    None
+${KUBERNETES_PAYLOAD}    None
+${EOSC_NODE_ALLOCATION_ID}    None
+${EOSC_NODE_PAYLOAD}    None
 
 *** Keywords ***
 
@@ -397,6 +403,20 @@ ADM API Deploy Invalid Application Returns Error
     Assert Error Payload    ${error}
     Should Be Equal As Strings    ${error}[id]    400
 
+ADM API Dry Run Deployment
+    [Documentation]    Estimate deployment resources without creating a deployment.
+    Skip If    '${APPLICATION_ID}' == 'None'    No applications available in the configured backend.
+    ${application_response}=    GET    ${ADM_ENDPOINT}/application/${APPLICATION_ID}    expected_status=200    headers=${ADM_AUTH_HEADER}
+    ${application_payload}=    Set Variable    ${application_response.json()}
+    Dictionary Should Contain Key    ${application_payload}    blueprint
+    ${input_name}    ${input_value}=    Get One TOSCA Input For Deployment    ${application_payload}[blueprint]
+    Skip If    '${input_name}' == 'None'    Application blueprint does not expose topology_template.inputs.
+    ${payload}=    Build Deployment Payload    ${ALLOCATION_ID}    ${APPLICATION_ID}    ${input_name}    ${input_value}
+    ${params}=    Create Dictionary    dryRun=true
+    ${response}=    POST    ${ADM_ENDPOINT}/deployments    params=${params}    headers=${ADM_AUTH_HEADER}    json=${payload}    expected_status=200
+    ${dry_run_payload}=    Set Variable    ${response.json()}
+    Assert Cloud Quota Payload    ${dry_run_payload}
+
 ADM API Create Deployment
     [Documentation]    Create deployment using current allocation and one available application.
     Skip If    '${APPLICATION_ID}' == 'None'    No applications available in the configured backend.
@@ -405,21 +425,7 @@ ADM API Create Deployment
     Dictionary Should Contain Key    ${application_payload}    blueprint
     ${input_name}    ${input_value}=    Get One TOSCA Input For Deployment    ${application_payload}[blueprint]
     Skip If    '${input_name}' == 'None'    Application blueprint does not expose topology_template.inputs.
-    ${deployment_input}=    Create Dictionary    name=${input_name}    value=${input_value}
-    ${deployment_inputs}=    Create List    ${deployment_input}
-    ${allocation}=    Create Dictionary
-    ...    kind=AllocationId
-    ...    id=${ALLOCATION_ID}
-    ...    infoLink=${ADM_ENDPOINT}/allocation/${ALLOCATION_ID}
-    ${application}=    Create Dictionary
-    ...    kind=ApplicationId
-    ...    id=${APPLICATION_ID}
-    ...    version=latest
-    ...    infoLink=${ADM_ENDPOINT}/application/${APPLICATION_ID}
-    ${payload}=    Create Dictionary
-    ...    allocation=${allocation}
-    ...    application=${application}
-    ...    inputs=${deployment_inputs}
+    ${payload}=    Build Deployment Payload    ${ALLOCATION_ID}    ${APPLICATION_ID}    ${input_name}    ${input_value}
     ${response}=    POST    ${ADM_ENDPOINT}/deployments    headers=${ADM_AUTH_HEADER}    json=${payload}    expected_status=202
     ${dep}=    Set Variable    ${response.json()}
     Assert Reference Payload    ${dep}
@@ -483,6 +489,101 @@ ADM API Delete Deployment
     ${payload}=    Set Variable    ${response.json()}
     Should Be Equal    ${payload}[message]    Deleting
     Set Suite Variable    ${DEPLOYMENT_ID}    None
+
+ADM API Create OpenStack Environment Allocation
+    [Documentation]    Create and validate an OpenStackEnvironment allocation.
+    ${payload}=    Build OpenStack Environment Payload
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    POST    ${ADM_ENDPOINT}/allocations    headers=${headers}    json=${payload}    expected_status=201
+    ${alloc_id}=    Set Variable    ${response.json()}
+    Assert Allocation Id Payload    ${alloc_id}
+    Set Suite Variable    ${OPENSTACK_ALLOCATION_ID}    ${alloc_id}[id]
+    Set Suite Variable    ${OPENSTACK_PAYLOAD}    ${payload}
+
+ADM API Get OpenStack Environment Allocation
+    [Documentation]    Retrieve and validate OpenStackEnvironment allocation data.
+    Skip If    '${OPENSTACK_ALLOCATION_ID}' == 'None'    OpenStack allocation was not created in previous test.
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    GET    ${ADM_ENDPOINT}/allocation/${OPENSTACK_ALLOCATION_ID}    expected_status=200    headers=${headers}
+    ${retrieved}=    Set Variable    ${response.json()}
+    Should Be Equal    ${retrieved}[id]    ${OPENSTACK_ALLOCATION_ID}
+    Assert OpenStack Environment Stored    ${retrieved}    ${OPENSTACK_PAYLOAD}
+    Assert Self Link Returns Object    ${headers}    ${retrieved}
+
+ADM API Delete OpenStack Environment Allocation
+    [Documentation]    Delete the OpenStackEnvironment allocation.
+    Skip If    '${OPENSTACK_ALLOCATION_ID}' == 'None'    OpenStack allocation was not created in previous test.
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    DELETE    ${ADM_ENDPOINT}/allocation/${OPENSTACK_ALLOCATION_ID}    headers=${headers}    expected_status=200
+    ${result}=    Set Variable    ${response.json()}
+    Dictionary Should Contain Key    ${result}    message
+
+ADM API Create Kubernetes Environment Allocation
+    [Documentation]    Create and validate a KubernetesEnvironment allocation.
+    ${payload}=    Build Kubernetes Environment Payload
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    POST    ${ADM_ENDPOINT}/allocations    headers=${headers}    json=${payload}    expected_status=201
+    ${alloc_id}=    Set Variable    ${response.json()}
+    Assert Allocation Id Payload    ${alloc_id}
+    Set Suite Variable    ${KUBERNETES_ALLOCATION_ID}    ${alloc_id}[id]
+    Set Suite Variable    ${KUBERNETES_PAYLOAD}    ${payload}
+
+ADM API Get Kubernetes Environment Allocation
+    [Documentation]    Retrieve and validate KubernetesEnvironment allocation data.
+    Skip If    '${KUBERNETES_ALLOCATION_ID}' == 'None'    Kubernetes allocation was not created in previous test.
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    GET    ${ADM_ENDPOINT}/allocation/${KUBERNETES_ALLOCATION_ID}    expected_status=200    headers=${headers}
+    ${retrieved}=    Set Variable    ${response.json()}
+    Should Be Equal    ${retrieved}[id]    ${KUBERNETES_ALLOCATION_ID}
+    Assert Kubernetes Environment Stored    ${retrieved}    ${KUBERNETES_PAYLOAD}
+    Assert Self Link Returns Object    ${headers}    ${retrieved}
+
+ADM API Delete Kubernetes Environment Allocation
+    [Documentation]    Delete the KubernetesEnvironment allocation.
+    Skip If    '${KUBERNETES_ALLOCATION_ID}' == 'None'    Kubernetes allocation was not created in previous test.
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    DELETE    ${ADM_ENDPOINT}/allocation/${KUBERNETES_ALLOCATION_ID}    headers=${headers}    expected_status=200
+    ${result}=    Set Variable    ${response.json()}
+    Dictionary Should Contain Key    ${result}    message
+
+ADM API Create EOSC Node Environment Allocation
+    [Documentation]    Create and validate an EoscNodeEnvironment allocation.
+    ${payload}=    Build EOSC Node Environment Payload
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    POST    ${ADM_ENDPOINT}/allocations    headers=${headers}    json=${payload}    expected_status=anything
+    Should Be True    ${response.status_code} == 201 or ${response.status_code} == 303    Server returned status ${response.status_code}, expected 201 or 303. Response: ${response.text}
+    ${alloc_id}=    Set Variable    ${EMPTY}
+    IF    ${response.status_code} == 201
+        ${json_payload}=    Set Variable    ${response.json()}
+        Assert Allocation Id Payload    ${json_payload}
+        ${alloc_id}=    Set Variable    ${json_payload}[id]
+    ELSE IF    ${response.status_code} == 303
+        ${location}=    Get From Dictionary    ${response.headers}    Location
+        Should Not Be Empty    ${location}
+        Should Contain    ${location}    /allocation/
+        ${parts}=    Split String    ${location}    /
+        ${alloc_id}=    Get From List    ${parts}    -1
+    END
+    Run Keyword If    '${alloc_id}' != ''    Set Suite Variable    ${EOSC_NODE_ALLOCATION_ID}    ${alloc_id}
+    Run Keyword If    '${alloc_id}' != ''    Set Suite Variable    ${EOSC_NODE_PAYLOAD}    ${payload}
+
+ADM API Get EOSC Node Environment Allocation
+    [Documentation]    Retrieve and validate EoscNodeEnvironment allocation data.
+    Skip If    '${EOSC_NODE_ALLOCATION_ID}' == 'None'    EOSC Node allocation was not created in previous test.
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    GET    ${ADM_ENDPOINT}/allocation/${EOSC_NODE_ALLOCATION_ID}    expected_status=200    headers=${headers}
+    ${retrieved}=    Set Variable    ${response.json()}
+    Should Be Equal    ${retrieved}[id]    ${EOSC_NODE_ALLOCATION_ID}
+    Assert EOSC Node Environment Stored    ${retrieved}    ${EOSC_NODE_PAYLOAD}
+    Assert Self Link Returns Object    ${headers}    ${retrieved}
+
+ADM API Delete EOSC Node Environment Allocation
+    [Documentation]    Delete the EoscNodeEnvironment allocation.
+    Skip If    '${EOSC_NODE_ALLOCATION_ID}' == 'None'    EOSC Node allocation was not created in previous test.
+    ${headers}=    Generate ADM Auth Header
+    ${response}=    DELETE    ${ADM_ENDPOINT}/allocation/${EOSC_NODE_ALLOCATION_ID}    headers=${headers}    expected_status=200
+    ${result}=    Set Variable    ${response.json()}
+    Dictionary Should Contain Key    ${result}    message
 
 ADM API Delete Allocation
     [Documentation]    Delete created allocation and verify cleanup.

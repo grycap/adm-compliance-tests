@@ -26,9 +26,10 @@ Required values:
 
 - `adm_endpoint`: Base URL of the ADM instance (for example `https://adm.example.org`)
 - `oidc_access_token`: OIDC access token used as `Authorization: Bearer <token>`
-- `allocation_to_create`: JSON payload used by tests to create an allocation. Default is `{"kind":"DummyEnvironment"}`. This kind of Allocation is not defined in the ADM standard
-but is defined in the ADIM service for convenience to perform these tests. Replace with
-any Allocation supported by the underlying service.
+- `allocation_to_create`: JSON payload used by tests to create an allocation, that will be used to make the
+deployment. Default is `{"kind":"DummyEnvironment"}`. This kind of Allocation is not defined in the ADM standard
+but is defined in the [ADIM service](https://github.com/grycap/adim/) for convenience to perform these tests.
+Replace with any Allocation supported by the underlying service.
 
 ## Running Tests
 
@@ -58,6 +59,7 @@ The suite currently exercises these OpenAPI paths:
 - `GET /application/{application_id}` (only when applications are available)
 - `GET /deployments`
 - `POST /deployments`
+- `POST /deployments?dryRun=true`
 - `GET /deployment/{deployment_id}`
 - `DELETE /deployment/{deployment_id}`
 
