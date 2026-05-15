@@ -42,7 +42,7 @@ robot -V .env.yaml -d results tests
 Run only the ADM API suite:
 
 ```bash
-robot -V .env.yaml -d results tests/im-api.robot
+robot -V .env.yaml -d results tests/adm-api.robot
 ```
 
 ## Covered Endpoints
