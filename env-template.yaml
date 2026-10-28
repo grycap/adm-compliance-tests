@@ -1,3 +1,5 @@
 adm_endpoint: <COMPLETE>
 oidc_access_token: <COMPLETE>
 allocation_to_create: '{"kind":"DummyEnvironment"}'
+# Optional: enable public-allocation compliance tests with an admin identity.
+oidc_public_admin_access_token: <COMPLETE>
