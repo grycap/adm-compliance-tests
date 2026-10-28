@@ -212,7 +212,8 @@ ADM Public Allocations Are Redacted For Non Admins
     ${user_headers}=    Create Dictionary    Authorization=Bearer ${oidc_access_token}    Content-Type=application/json
     ${secret}=    Evaluate    'robot-' + __import__('uuid').uuid4().hex
     ${payload}=    Create Dictionary    kind=KubernetesEnvironment    host=https://kubernetes.example.org    token=${secret}
-    ${response}=    POST    ${ADM_ENDPOINT}/allocations?scope=public    headers=${admin_headers}    json=${payload}    expected_status=201
+    ${params}=    Create Dictionary    scope=public
+    ${response}=    POST    ${ADM_ENDPOINT}/allocations    params=${params}    headers=${admin_headers}    json=${payload}    expected_status=201
     ${created}=    Set Variable    ${response.json()}
     Set Suite Variable    ${PUBLIC_ALLOCATION_ID}    ${created}[id]
     ${admin_get}=    GET    ${ADM_ENDPOINT}/allocation/${PUBLIC_ALLOCATION_ID}    headers=${admin_headers}    expected_status=200
@@ -225,7 +226,8 @@ ADM Public Allocations Are Redacted For Non Admins
     ${listed}=    Evaluate    [item for item in $user_list.json()["elements"] if item.get("id") == $PUBLIC_ALLOCATION_ID]
     Should Not Be Empty    ${listed}
     Should Not Contain    ${user_list.text}    ${secret}
-    ${denied}=    POST    ${ADM_ENDPOINT}/allocations?scope=public    headers=${user_headers}    json=${payload}    expected_status=403
+    ${params}=    Create Dictionary    scope=public
+    ${denied}=    POST    ${ADM_ENDPOINT}/allocations    params=${params}    headers=${user_headers}    json=${payload}    expected_status=403
     Should Be Equal As Integers    ${denied.status_code}    403
 
 ADM API Get Allocation
