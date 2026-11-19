@@ -27,6 +27,7 @@ ${KUBERNETES_ALLOCATION_ID}    None
 ${KUBERNETES_PAYLOAD}    None
 ${EOSC_NODE_ALLOCATION_ID}    None
 ${EOSC_NODE_PAYLOAD}    None
+${PUBLIC_ALLOCATION_ID}    None
 
 *** Keywords ***
 
@@ -48,6 +49,13 @@ Suite Cleanup
     [Documentation]    Clean up the suite
     Run Keyword If    '${DEPLOYMENT_ID}'!='None'    Delete Test Deployment    ${DEPLOYMENT_ID}
     Run Keyword If    '${ALLOCATION_ID}'!='None'    Delete Test Allocation    ${ALLOCATION_ID}
+    Run Keyword If    '${PUBLIC_ALLOCATION_ID}'!='None'    Delete Public Test Allocation    ${PUBLIC_ALLOCATION_ID}
+
+Delete Public Test Allocation
+    [Documentation]    Delete public allocation created by public allocation compliance tests.
+    [Arguments]    ${allocation_id}
+    ${headers}=    Create Dictionary    Authorization=Bearer ${oidc_public_admin_access_token}    Content-Type=application/json
+    Delete Allocation If Present    ${headers}    ${allocation_id}
 
 *** Settings ***
 Suite Teardown    Suite Cleanup
@@ -196,6 +204,31 @@ ADM API Create Allocation
     Set Suite Variable    ${ALLOCATION_ID}    ${allocation_id}
     Set Suite Variable    ${ALLOCATION_KIND}    ${allocation_kind}
     Should Not Be Empty    ${ALLOCATION_ID}
+
+ADM Public Allocations Are Redacted For Non Admins
+    [Documentation]    Verify public allocation publication, visibility, and secret redaction for non-admin users.
+    Skip If    '${oidc_public_admin_access_token}' == ''    Configure the optional public-allocation admin token to run this test.
+    ${admin_headers}=    Create Dictionary    Authorization=Bearer ${oidc_public_admin_access_token}    Content-Type=application/json
+    ${user_headers}=    Create Dictionary    Authorization=Bearer ${oidc_access_token}    Content-Type=application/json
+    ${secret}=    Evaluate    'robot-' + __import__('uuid').uuid4().hex
+    ${payload}=    Create Dictionary    kind=KubernetesEnvironment    host=https://kubernetes.example.org    token=${secret}
+    ${params}=    Create Dictionary    scope=public
+    ${response}=    POST    ${ADM_ENDPOINT}/allocations    params=${params}    headers=${admin_headers}    json=${payload}    expected_status=201
+    ${created}=    Set Variable    ${response.json()}
+    Set Suite Variable    ${PUBLIC_ALLOCATION_ID}    ${created}[id]
+    ${admin_get}=    GET    ${ADM_ENDPOINT}/allocation/${PUBLIC_ALLOCATION_ID}    headers=${admin_headers}    expected_status=200
+    Should Be Equal    ${admin_get.json()}[token]    ${secret}
+    ${user_get}=    GET    ${ADM_ENDPOINT}/allocation/${PUBLIC_ALLOCATION_ID}    headers=${user_headers}    expected_status=200
+    ${user_allocation}=    Set Variable    ${user_get.json()}
+    Should Be Equal    ${user_allocation}[id]    ${PUBLIC_ALLOCATION_ID}
+    Should Not Contain    ${user_get.text}    ${secret}
+    ${user_list}=    GET    ${ADM_ENDPOINT}/allocations    headers=${user_headers}    expected_status=200
+    ${listed}=    Evaluate    [item for item in $user_list.json()["elements"] if item.get("id") == $PUBLIC_ALLOCATION_ID]
+    Should Not Be Empty    ${listed}
+    Should Not Contain    ${user_list.text}    ${secret}
+    ${params}=    Create Dictionary    scope=public
+    ${denied}=    POST    ${ADM_ENDPOINT}/allocations    params=${params}    headers=${user_headers}    json=${payload}    expected_status=403
+    Should Be Equal As Integers    ${denied.status_code}    403
 
 ADM API Get Allocation
     [Documentation]    Retrieve created allocation.

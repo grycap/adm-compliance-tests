@@ -159,7 +159,7 @@ Get One TOSCA Input For Deployment
     END
     ${input_name}=    Evaluate    next(iter($inputs_dict.keys()))
     ${input_schema}=    Get From Dictionary    ${inputs_dict}    ${input_name}
-    ${input_value}=    Evaluate    str(($input_schema.get("default") if isinstance($input_schema, dict) else None) if (($input_schema.get("default") if isinstance($input_schema, dict) else None) is not None) else ("true" if (isinstance($input_schema, dict) and $input_schema.get("type") == "boolean") else ("1" if (isinstance($input_schema, dict) and $input_schema.get("type") in ["integer", "float", "number"]) else "robot-ci")))
+    ${input_value}=    Evaluate    {"boolean": True, "integer": 1, "float": 1.0, "number": 1.0}.get($input_schema.get("type"), $input_schema.get("default") if $input_schema.get("default") is not None else "robot-ci")
     RETURN    ${input_name}    ${input_value}
 
 Build Deployment Payload

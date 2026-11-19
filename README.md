@@ -31,6 +31,14 @@ deployment. Default is `{"kind":"DummyEnvironment"}`. This kind of Allocation is
 but is defined in the [ADIM service](https://github.com/grycap/adim/) for convenience to perform these tests.
 Replace with any Allocation supported by the underlying service.
 
+Optional values to run the public-allocation checks:
+
+- `oidc_public_admin_access_token`: EGI Check-in access token for an ADIM user configured in `PUBLIC_ALLOCATIONS_ADMINS`. The existing `oidc_access_token` is used as the non-admin identity.
+
+When both are set, the suite creates a public Kubernetes allocation with a unique dummy token, verifies that an admin sees
+the full allocation, verifies that the non-admin can read/list it without receiving the token, and checks that the
+non-admin receives 403 when attempting to publish. The test deletes the created allocation during suite cleanup.
+
 ## Running Tests
 
 Run the full suite:
